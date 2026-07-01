@@ -1,59 +1,46 @@
 import 'dart:io';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:trplapp/dto/datas.dart';
-import 'package:trplapp/endpoints/endpoints.dart';
 
 class DataService {
   static Future<List<Datas>> fetchDatas() async {
-    final response = await http.get(Uri.parse(Endpoints.datas));
-    
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      
-      return (data['datas'] as List<dynamic>)
-          .map((item) => Datas.fromJson(item as Map<String, dynamic>))
-          .toList();
-    } else {
-      throw Exception('Failed to load data');
+    try {
+      final response = await Supabase.instance.client
+          .from('presensi')
+          .select()
+          .order('created_at', ascending: false);
+          
+      return response.map((item) => Datas.fromJson(item)).toList();
+    } catch (e) {
+      throw Exception('Failed to load data: $e');
     }
   }
 
-  // fungsi upload foto
- //fungsi upload foto
-  //fungsi upload foto
   Future<dynamic> postGambarKamera(File foto, String nim, {String? judul, String? deskripsi, String? status, String? tanggal}) async {
     try {
-      var request = http.MultipartRequest('POST', Uri.parse(Endpoints.datas));
+      final supabase = Supabase.instance.client;
+      // Get filename from path
+      final fileName = '${DateTime.now().millisecondsSinceEpoch}_${foto.path.split(Platform.pathSeparator).last}';
       
-      request.headers.addAll({
-        'Accept': 'application/json',
-      });
+      // Upload to Supabase Storage
+      await supabase.storage.from('foto_presensi').upload(fileName, foto);
       
-      request.fields['name'] = nim;
-      if (judul != null) request.fields['judul'] = judul;
-      if (deskripsi != null) request.fields['deskripsi'] = deskripsi;
-      if (status != null) request.fields['status'] = status;
-      if (tanggal != null) request.fields['tanggal'] = tanggal;
-      request.files.add(await http.MultipartFile.fromPath('image', foto.path));
+      // Get public URL
+      final imageUrl = supabase.storage.from('foto_presensi').getPublicUrl(fileName);
       
-      var response = await request.send();
-      var responseData = await response.stream.toBytes();
-      var responseString = String.fromCharCodes(responseData);
+      // Insert to table
+      final data = await supabase.from('presensi').insert({
+        'name': nim,
+        'judul': judul,
+        'deskripsi': deskripsi,
+        'status': status,
+        'image_url': imageUrl,
+        if (tanggal != null) 'created_at': tanggal,
+      }).select();
       
-      print("===== DEBUG MESSAGE =====");
-      print("Status Code API: ${response.statusCode}");
-      print("Response API: $responseString");
-      print("=========================");
-      
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        return jsonDecode(responseString);
-      } else {
-        throw Exception('Server merespons dengan kode ${response.statusCode}: $responseString');
-      }
+      return data;
     } catch (e) {
-      throw Exception('$e');
+      throw Exception('Error uploading data: $e');
     }
   }
 }

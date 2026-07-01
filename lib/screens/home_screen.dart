@@ -6,7 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:trplapp/dto/datas.dart';
-import 'package:trplapp/endpoints/endpoints.dart';
+
 import 'package:trplapp/services/data_service.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -223,7 +223,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                       ? ClipRRect(
                                           borderRadius: BorderRadius.circular(10.0),
                                           child: Image.network(
-                                            Uri.parse('${Endpoints.baseURLLive}/public/${item.imageUrl!}').toString(),
+                                            item.imageUrl!,
                                             width: 60,
                                             height: 60,
                                             fit: BoxFit.cover,

@@ -37,7 +37,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2),
         ),
       ),
-      body: _screens.elementAt(_selectedIndex),
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: _screens,
+      ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           boxShadow: [

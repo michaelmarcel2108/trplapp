@@ -23,7 +23,7 @@ class Datas {
 
   factory Datas.fromJson(Map<String, dynamic> json) {
     return Datas(
-      idDatas: json['_id_datas'] != null ? json['_id_datas'] as int : 0,
+      idDatas: (json['id'] ?? json['_id_datas'] ?? 0) as int,
       
       name: json['name'] as String? ?? 'No Name',
       imageUrl: json['image_url'] as String?,

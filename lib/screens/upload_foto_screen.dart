@@ -181,7 +181,7 @@ class _UploadFotoState extends State<UploadFoto> {
 
                     // UI Form Input Status
                     DropdownButtonFormField<String>(
-                      value: _status,
+                      initialValue: _status,
                       decoration: const InputDecoration(
                         labelText: 'Status Kehadiran',
                         border: OutlineInputBorder(),
