@@ -5,6 +5,9 @@ class Datas {
   final DateTime createdAt;
   final DateTime updatedAt;
   final DateTime? deletedAt;
+  final String? judul;
+  final String? deskripsi;
+  final String? status;
 
   Datas({
     required this.idDatas,
@@ -13,6 +16,9 @@ class Datas {
     required this.createdAt,
     required this.updatedAt,
     required this.deletedAt,
+    this.judul,
+    this.deskripsi,
+    this.status,
   });
 
   factory Datas.fromJson(Map<String, dynamic> json) {
@@ -33,6 +39,9 @@ class Datas {
       deletedAt: json['deleted_at'] != null
           ? DateTime.parse(json['deleted_at'] as String)
           : null,
+      judul: json['judul'] as String?,
+      deskripsi: json['deskripsi'] as String?,
+      status: json['status'] as String?,
     );
   }
 }

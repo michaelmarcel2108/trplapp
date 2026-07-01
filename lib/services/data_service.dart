@@ -23,7 +23,7 @@ class DataService {
   // fungsi upload foto
  //fungsi upload foto
   //fungsi upload foto
-  Future<dynamic> postGambarKamera(File foto, String nim) async {
+  Future<dynamic> postGambarKamera(File foto, String nim, {String? judul, String? deskripsi, String? status, String? tanggal}) async {
     try {
       var request = http.MultipartRequest('POST', Uri.parse(Endpoints.datas));
       
@@ -32,6 +32,10 @@ class DataService {
       });
       
       request.fields['name'] = nim;
+      if (judul != null) request.fields['judul'] = judul;
+      if (deskripsi != null) request.fields['deskripsi'] = deskripsi;
+      if (status != null) request.fields['status'] = status;
+      if (tanggal != null) request.fields['tanggal'] = tanggal;
       request.files.add(await http.MultipartFile.fromPath('image', foto.path));
       
       var response = await request.send();

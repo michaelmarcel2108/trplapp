@@ -17,10 +17,14 @@ class _UploadFotoState extends State<UploadFoto> {
   // 1 FormController
   final _formKey = GlobalKey<FormState>();
   final _nimController = TextEditingController();
+  final _judulController = TextEditingController();
+  final _deskripsiController = TextEditingController();
+
   // 2 Transaksional
   File? foto;
   String? fotoPath;
   bool isLoading = false;
+  String? _status;
 
   // Inisialisasi ImagePicker untuk akses kamera
   final ImagePicker _picker = ImagePicker();
@@ -63,7 +67,14 @@ class _UploadFotoState extends State<UploadFoto> {
 
       try {
         // Memanggil fungsi postGambarKamera dari DataService
-        await DataService().postGambarKamera(foto!, _nimController.text);
+        await DataService().postGambarKamera(
+          foto!, 
+          _nimController.text,
+          judul: _judulController.text,
+          deskripsi: _deskripsiController.text,
+          status: _status ?? 'Hadir',
+          tanggal: DateTime.now().toIso8601String(),
+        );
         
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -75,6 +86,9 @@ class _UploadFotoState extends State<UploadFoto> {
           foto = null;
           fotoPath = null;
           _nimController.clear();
+          _judulController.clear();
+          _deskripsiController.clear();
+          _status = null;
         });
       } catch (e) {
         if (!mounted) return;
@@ -92,6 +106,8 @@ class _UploadFotoState extends State<UploadFoto> {
   @override
   void dispose() {
     _nimController.dispose();
+    _judulController.dispose();
+    _deskripsiController.dispose();
     super.dispose();
   }
 
@@ -121,7 +137,70 @@ class _UploadFotoState extends State<UploadFoto> {
                       ),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
-                          return 'NIM tidak boleh kosong';
+                          return 'Nama tidak boleh kosong';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 20),
+
+                    // UI Form Input Judul Kegiatan
+                    TextFormField(
+                      controller: _judulController,
+                      decoration: const InputDecoration(
+                        labelText: 'Judul Kegiatan',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.title),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Judul kegiatan tidak boleh kosong';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 20),
+
+                    // UI Form Input Deskripsi Kegiatan
+                    TextFormField(
+                      controller: _deskripsiController,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        labelText: 'Deskripsi Kegiatan',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.description),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Deskripsi kegiatan tidak boleh kosong';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 20),
+
+                    // UI Form Input Status
+                    DropdownButtonFormField<String>(
+                      value: _status,
+                      decoration: const InputDecoration(
+                        labelText: 'Status Kehadiran',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.check_circle_outline),
+                      ),
+                      items: ['Hadir', 'Izin', 'Sakit']
+                          .map((label) => DropdownMenuItem(
+                                value: label,
+                                child: Text(label),
+                              ))
+                          .toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          _status = value;
+                        });
+                      },
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Status kehadiran harus dipilih';
                         }
                         return null;
                       },
