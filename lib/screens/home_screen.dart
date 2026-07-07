@@ -1,35 +1,35 @@
 // ignore_for_file: library_private_types_in_public_api
 
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
 import 'package:trplapp/dto/datas.dart';
-
 import 'package:trplapp/services/data_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  _HomeScreenState createState() => _HomeScreenState();
+  HomeScreenState createState() => HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class HomeScreenState extends State<HomeScreen> {
   late Future<List<Datas>> _datasFuture;
   Map<DateTime, List<Datas>> _groupedDatas = {};
-  
+
   CalendarFormat _calendarFormat = CalendarFormat.month;
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
   String _employeeName = "Karyawan";
+  String? _profileImagePath;
 
   @override
   void initState() {
     super.initState();
     _selectedDay = _focusedDay;
-    _loadProfileName();
+    loadProfileName();
     _fetchDatas();
   }
 
@@ -40,17 +40,22 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  Future<void> _loadProfileName() async {
+  Future<void> loadProfileName() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _employeeName = prefs.getString('emp_name') ?? "Karyawan";
+      _profileImagePath = prefs.getString('emp_image_path');
     });
   }
 
   void _groupDatasByDate(List<Datas> datas) {
     _groupedDatas = {};
     for (var data in datas) {
-      final date = DateTime(data.createdAt.year, data.createdAt.month, data.createdAt.day);
+      final date = DateTime(
+        data.createdAt.year,
+        data.createdAt.month,
+        data.createdAt.day,
+      );
       if (_groupedDatas[date] == null) {
         _groupedDatas[date] = [];
       }
@@ -74,13 +79,20 @@ class _HomeScreenState extends State<HomeScreen> {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final selectedEvents = _selectedDay != null ? _getEventsForDay(_selectedDay!) : [];
+          final selectedEvents = _selectedDay != null
+              ? _getEventsForDay(_selectedDay!)
+              : [];
 
           return CustomScrollView(
             slivers: [
               SliverToBoxAdapter(
                 child: Container(
-                  padding: const EdgeInsets.only(top: 20, left: 20, right: 20, bottom: 40),
+                  padding: const EdgeInsets.only(
+                    top: 20,
+                    left: 20,
+                    right: 20,
+                    bottom: 40,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.indigo[800],
                     borderRadius: const BorderRadius.only(
@@ -88,20 +100,45 @@ class _HomeScreenState extends State<HomeScreen> {
                       bottomRight: Radius.circular(30),
                     ),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
-                        'Selamat datang kembali,',
-                        style: TextStyle(color: Colors.white70, fontSize: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Selamat datang kembali,',
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const SizedBox(height: 5),
+                            Text(
+                              _employeeName,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: 5),
-                      Text(
-                        _employeeName,
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold),
+                      CircleAvatar(
+                        radius: 30,
+                        backgroundColor: Colors.white24,
+                        backgroundImage: _profileImagePath != null
+                            ? FileImage(File(_profileImagePath!))
+                            : null,
+                        child: _profileImagePath == null
+                            ? const Icon(
+                                Icons.person,
+                                size: 40,
+                                color: Colors.white,
+                              )
+                            : null,
                       ),
                     ],
                   ),
@@ -120,7 +157,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           color: Colors.black.withValues(alpha: 0.05),
                           blurRadius: 10,
                           spreadRadius: 2,
-                        )
+                        ),
                       ],
                     ),
                     child: Padding(
@@ -185,10 +222,16 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20.0,
+                    vertical: 10,
+                  ),
                   child: Text(
                     'Riwayat Presensi (${_selectedDay != null ? DateFormat('dd MMM').format(_selectedDay!) : ''})',
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ),
@@ -205,13 +248,20 @@ class _HomeScreenState extends State<HomeScreen> {
                 )
               else
                 SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      final item = selectedEvents[index];
-                      return Card(
-                        margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                        elevation: 2,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                  delegate: SliverChildBuilderDelegate((context, index) {
+                    final item = selectedEvents[index];
+                    return Card(
+                      margin: const EdgeInsets.symmetric(
+                        horizontal: 16.0,
+                        vertical: 8.0,
+                      ),
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: InkWell(
+                        onTap: () => _showDetailModal(context, item),
                         child: Padding(
                           padding: const EdgeInsets.all(12.0),
                           child: Column(
@@ -221,14 +271,20 @@ class _HomeScreenState extends State<HomeScreen> {
                                 children: [
                                   item.imageUrl != null
                                       ? ClipRRect(
-                                          borderRadius: BorderRadius.circular(10.0),
+                                          borderRadius: BorderRadius.circular(
+                                            10.0,
+                                          ),
                                           child: Image.network(
                                             item.imageUrl!,
                                             width: 60,
                                             height: 60,
                                             fit: BoxFit.cover,
-                                            errorBuilder: (context, error, stackTrace) =>
-                                                const Icon(Icons.error, size: 60),
+                                            errorBuilder:
+                                                (context, error, stackTrace) =>
+                                                    const Icon(
+                                                      Icons.error,
+                                                      size: 60,
+                                                    ),
                                           ),
                                         )
                                       : Container(
@@ -236,64 +292,92 @@ class _HomeScreenState extends State<HomeScreen> {
                                           height: 60,
                                           decoration: BoxDecoration(
                                             color: Colors.grey[200],
-                                            borderRadius: BorderRadius.circular(10)
+                                            borderRadius: BorderRadius.circular(
+                                              10,
+                                            ),
                                           ),
-                                          child: const Icon(Icons.person, size: 40, color: Colors.grey),
+                                          child: const Icon(
+                                            Icons.person,
+                                            size: 40,
+                                            color: Colors.grey,
+                                          ),
                                         ),
                                   const SizedBox(width: 15),
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Text(
                                           item.judul ?? 'Presensi',
-                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                          ),
                                         ),
                                         const SizedBox(height: 4),
                                         Text(
-                                          DateFormat('HH:mm').format(item.createdAt),
-                                          style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                                          DateFormat(
+                                            'HH:mm',
+                                          ).format(item.createdAt),
+                                          style: TextStyle(
+                                            color: Colors.grey[600],
+                                            fontSize: 13,
+                                          ),
                                         ),
                                       ],
                                     ),
                                   ),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 6,
+                                    ),
                                     decoration: BoxDecoration(
-                                      color: _getStatusColor(item.status).withValues(alpha: 0.1),
+                                      color: _getStatusColor(
+                                        item.status,
+                                      ).withValues(alpha: 0.1),
                                       borderRadius: BorderRadius.circular(20),
-                                      border: Border.all(color: _getStatusColor(item.status).withValues(alpha: 0.5))
+                                      border: Border.all(
+                                        color: _getStatusColor(
+                                          item.status,
+                                        ).withValues(alpha: 0.5),
+                                      ),
                                     ),
                                     child: Text(
                                       item.status ?? 'Hadir',
                                       style: TextStyle(
                                         color: _getStatusColor(item.status),
                                         fontWeight: FontWeight.bold,
-                                        fontSize: 12
+                                        fontSize: 12,
                                       ),
                                     ),
                                   ),
                                 ],
                               ),
-                              if (item.deskripsi != null && item.deskripsi!.isNotEmpty) ...[
+                              if (item.deskripsi != null &&
+                                  item.deskripsi!.isNotEmpty) ...[
                                 const Padding(
                                   padding: EdgeInsets.symmetric(vertical: 8.0),
                                   child: Divider(),
                                 ),
                                 Text(
                                   'Catatan: ${item.deskripsi}',
-                                  style: const TextStyle(fontStyle: FontStyle.italic),
+                                  style: const TextStyle(
+                                    fontStyle: FontStyle.italic,
+                                  ),
                                 ),
-                              ]
+                              ],
                             ],
                           ),
                         ),
-                      );
-                    },
-                    childCount: selectedEvents.length,
-                  ),
+                      ),
+                    );
+                  }, childCount: selectedEvents.length),
                 ),
-              const SliverToBoxAdapter(child: SizedBox(height: 80)), // padding for FAB
+              const SliverToBoxAdapter(
+                child: SizedBox(height: 80),
+              ), // padding for FAB
             ],
           );
         },
@@ -303,13 +387,16 @@ class _HomeScreenState extends State<HomeScreen> {
           Navigator.pushNamed(context, '/upload_foto').then((_) {
             // Refresh data when coming back
             setState(() {
-               _fetchDatas();
+              _fetchDatas();
             });
           });
         },
         backgroundColor: Colors.indigo[800],
         icon: const Icon(Icons.add_a_photo, color: Colors.white),
-        label: const Text('Presensi', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        label: const Text(
+          'Presensi',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
       ),
     );
   }
@@ -334,7 +421,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
-  
+
   Color _getStatusColor(String? status) {
     if (status == null) return Colors.green;
     switch (status.toLowerCase()) {
@@ -346,5 +433,145 @@ class _HomeScreenState extends State<HomeScreen> {
       default:
         return Colors.green;
     }
+  }
+
+  void _showDetailModal(BuildContext context, Datas item) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+        ),
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Center(
+                  child: Container(
+                    width: 50,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'Detail Presensi',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.indigo[800],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                if (item.imageUrl != null)
+                  Center(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(15),
+                      child: Image.network(
+                        item.imageUrl!,
+                        height: 200,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) =>
+                            const SizedBox(
+                              height: 200,
+                              child: Center(child: Icon(Icons.error, size: 50)),
+                            ),
+                      ),
+                    ),
+                  )
+                else
+                  Center(
+                    child: Container(
+                      height: 200,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[200],
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: const Icon(
+                        Icons.person,
+                        size: 80,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 20),
+                _buildDetailRow(Icons.title, 'Judul', item.judul ?? 'Presensi'),
+                const SizedBox(height: 10),
+                _buildDetailRow(
+                  Icons.access_time,
+                  'Waktu',
+                  DateFormat('dd MMM yyyy, HH:mm').format(item.createdAt),
+                ),
+                const SizedBox(height: 10),
+                _buildDetailRow(
+                  Icons.info_outline,
+                  'Status',
+                  item.status ?? 'Hadir',
+                  valueColor: _getStatusColor(item.status),
+                ),
+                if (item.deskripsi != null && item.deskripsi!.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  _buildDetailRow(
+                    Icons.description,
+                    'Catatan',
+                    item.deskripsi!,
+                  ),
+                ],
+                const SizedBox(height: 30),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(
+    IconData icon,
+    String label,
+    String value, {
+    Color? valueColor,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 20, color: Colors.grey[600]),
+        const SizedBox(width: 10),
+        SizedBox(
+          width: 80,
+          child: Text(
+            label,
+            style: TextStyle(
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+        const Text(': '),
+        Expanded(
+          child: Text(
+            value,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: valueColor ?? Colors.black87,
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }

@@ -1,6 +1,9 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:image_picker/image_picker.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -15,6 +18,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _phoneController = TextEditingController();
   bool _isLoading = true;
   int? _localProfileId;
+  String? _profileImagePath;
+  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
@@ -32,6 +37,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _nameController.text = prefs.getString('emp_name') ?? '';
     _positionController.text = prefs.getString('emp_position') ?? '';
     _phoneController.text = prefs.getString('emp_phone') ?? '';
+    _profileImagePath = prefs.getString('emp_image_path');
 
     // Jika punya ID, coba sinkronkan data terbaru dari Supabase
     if (_localProfileId != null) {
@@ -148,10 +154,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               child: Column(
                 children: [
-                  CircleAvatar(
-                    radius: 50,
-                    backgroundColor: Colors.white,
-                    child: Icon(Icons.person, size: 60, color: Colors.indigo[300]),
+                  Stack(
+                    alignment: Alignment.bottomRight,
+                    children: [
+                      GestureDetector(
+                        onTap: _showImagePickerModal,
+                        child: CircleAvatar(
+                          radius: 50,
+                          backgroundColor: Colors.white,
+                          backgroundImage: _profileImagePath != null ? FileImage(File(_profileImagePath!)) : null,
+                          child: _profileImagePath == null 
+                              ? Icon(Icons.person, size: 60, color: Colors.indigo[300]) 
+                              : null,
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: _showImagePickerModal,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: Colors.blue,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.indigo[800]!, width: 2),
+                          ),
+                          child: const Icon(Icons.camera_alt, size: 20, color: Colors.white),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 15),
                   const Text(
@@ -246,6 +275,65 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final XFile? pickedFile = await _picker.pickImage(source: source);
+      if (pickedFile != null) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('emp_image_path', pickedFile.path);
+        setState(() {
+          _profileImagePath = pickedFile.path;
+        });
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Foto profil berhasil diubah secara lokal.')),
+        );
+      }
+    } catch (e) {
+      debugPrint("Gagal mengambil foto: $e");
+    }
+  }
+
+  void _showImagePickerModal() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Wrap(
+            children: [
+              const Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Text(
+                  'Ubah Foto Profil',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library),
+                title: const Text('Galeri'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickImage(ImageSource.gallery);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_camera),
+                title: const Text('Kamera'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickImage(ImageSource.camera);
+                },
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 

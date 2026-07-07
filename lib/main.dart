@@ -5,16 +5,8 @@ import 'screens/main_navigation_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/upload_foto_screen.dart';
 
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:trplapp/endpoints/endpoints.dart';
-
-void main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  await Supabase.initialize(
-    url: Endpoints.supabaseUrl,
-    anonKey: Endpoints.supabaseAnonKey,
-  );
 
   runApp(const MyApp());
 }

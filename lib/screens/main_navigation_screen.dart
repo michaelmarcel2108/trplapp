@@ -13,15 +13,20 @@ class MainNavigationScreen extends StatefulWidget {
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _selectedIndex = 0;
 
-  static const List<Widget> _screens = <Widget>[
-    HomeScreen(),
-    ProfileScreen(),
+  final GlobalKey<HomeScreenState> _homeKey = GlobalKey();
+
+  late final List<Widget> _screens = [
+    HomeScreen(key: _homeKey),
+    const ProfileScreen(),
   ];
 
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
     });
+    if (index == 0) {
+      _homeKey.currentState?.loadProfileName();
+    }
   }
 
   @override
