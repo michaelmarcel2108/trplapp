@@ -43,7 +43,7 @@ class HomeScreenState extends State<HomeScreen> {
   Future<void> loadProfileName() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _employeeName = prefs.getString('emp_name') ?? "Karyawan";
+      _employeeName = prefs.getString('nama') ?? "Karyawan";
       _profileImagePath = prefs.getString('emp_image_path');
     });
   }

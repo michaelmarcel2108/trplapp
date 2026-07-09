@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:trplapp/services/data_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -10,38 +10,68 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _usernameController = TextEditingController();
+  final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
 
   void _login() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Email dan password tidak boleh kosong')),
+      );
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
 
     try {
-      final user = await DataService.login(
-        _usernameController.text,
-        _passwordController.text,
+      final supabase = Supabase.instance.client;
+      
+      // 1. Authenticate with Supabase
+      final response = await supabase.auth.signInWithPassword(
+        email: email,
+        password: password,
       );
 
+      final user = response.user;
+
       if (user != null) {
+        // 2. Fetch user profile data (role, name, etc.)
+        final profile = await supabase
+            .from('profiles')
+            .select()
+            .eq('id', user.id)
+            .maybeSingle();
+
         // Save login state
         final prefs = await SharedPreferences.getInstance();
         await prefs.setBool('isLoggedIn', true);
-        await prefs.setString('username', user['username']);
-        await prefs.setString('nama', user['nama']);
-        await prefs.setString('role', user['role']);
+        
+        // Save email as username fallback
+        await prefs.setString('username', email);
+        
+        if (profile != null) {
+          await prefs.setString('nama', profile['full_name'] ?? 'No Name');
+          await prefs.setString('role', profile['role'] ?? 'karyawan');
+        } else {
+          await prefs.setString('nama', 'No Name');
+          await prefs.setString('role', 'karyawan');
+        }
 
         if (mounted) {
           Navigator.pushReplacementNamed(context, '/main');
         }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Username atau password salah')),
-          );
-        }
+      }
+    } on AuthException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Login Gagal: ${e.message}')),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -56,6 +86,13 @@ class _LoginScreenState extends State<LoginScreen> {
         });
       }
     }
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
   }
 
   @override
@@ -76,11 +113,12 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             const SizedBox(height: 32),
             TextField(
-              controller: _usernameController,
+              controller: _emailController,
+              keyboardType: TextInputType.emailAddress,
               decoration: const InputDecoration(
-                labelText: 'Username',
+                labelText: 'Email',
                 border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.person),
+                prefixIcon: Icon(Icons.email),
               ),
             ),
             const SizedBox(height: 16),

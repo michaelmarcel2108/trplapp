@@ -6,9 +6,16 @@ import 'screens/main_navigation_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/upload_foto_screen.dart';
 import 'screens/login_screen.dart';
+import 'endpoints/endpoints.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  await Supabase.initialize(
+    url: Endpoints.supabaseUrl,
+    anonKey: Endpoints.supabaseAnonKey,
+  );
   
   final prefs = await SharedPreferences.getInstance();
   final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;

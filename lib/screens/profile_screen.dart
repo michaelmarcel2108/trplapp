@@ -1,11 +1,9 @@
 import 'dart:io';
 
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:http/http.dart' as http;
-import 'package:trplapp/endpoints/endpoints.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -19,7 +17,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _positionController = TextEditingController();
   final _phoneController = TextEditingController();
   bool _isLoading = true;
-  int? _localProfileId;
   String? _profileImagePath;
   final ImagePicker _picker = ImagePicker();
 
@@ -32,45 +29,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _loadProfile() async {
     final prefs = await SharedPreferences.getInstance();
 
-    // Coba ambil ID profil dari penyimpanan lokal
-    _localProfileId = prefs.getInt('profile_id');
-
     // Ambil data dasar dari shared_prefs sebagai cadangan sementara (optimistic loading)
-    _nameController.text = prefs.getString('emp_name') ?? '';
-    _positionController.text = prefs.getString('emp_position') ?? '';
+    _nameController.text = prefs.getString('nama') ?? '';
+    _positionController.text = prefs.getString('role') ?? '';
     _phoneController.text = prefs.getString('emp_phone') ?? '';
     _profileImagePath = prefs.getString('emp_image_path');
 
-    if (_localProfileId != null) {
-      try {
-        final url = Uri.parse(
-            '${Endpoints.supabaseUrl}/rest/v1/profil_karyawan?id=eq.$_localProfileId&select=*');
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user != null) {
+        final data = await Supabase.instance.client
+            .from('profiles')
+            .select()
+            .eq('id', user.id)
+            .maybeSingle();
+
+        if (data != null) {
+          setState(() {
+            _nameController.text = data['full_name'] ?? _nameController.text;
+            _positionController.text = data['role'] ?? _positionController.text;
             
-        final response = await http.get(url, headers: {
-          'apikey': Endpoints.supabaseAnonKey,
-          'Authorization': 'Bearer ${Endpoints.supabaseAnonKey}',
-          'Content-Type': 'application/json',
-        });
-
-        if (response.statusCode == 200) {
-          final List<dynamic> responseData = jsonDecode(response.body);
-          if (responseData.isNotEmpty) {
-            final data = responseData.first;
-            setState(() {
-              _nameController.text = data['nama_lengkap'] ?? '';
-              _positionController.text = data['jabatan'] ?? '';
-              _phoneController.text = data['no_telepon'] ?? '';
-
-              // Perbarui cache lokal juga
-              prefs.setString('emp_name', _nameController.text);
-              prefs.setString('emp_position', _positionController.text);
-              prefs.setString('emp_phone', _phoneController.text);
-            });
-          }
+            // Perbarui cache lokal juga
+            prefs.setString('nama', _nameController.text);
+            prefs.setString('role', _positionController.text);
+          });
         }
-      } catch (e) {
-        debugPrint('Gagal memuat profil dari API: $e');
       }
+    } catch (e) {
+      debugPrint('Gagal memuat profil dari Supabase: $e');
     }
 
     setState(() {
@@ -85,63 +71,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-
-      final profileData = {
-        'nama_lengkap': _nameController.text,
-        'jabatan': _positionController.text,
-        'no_telepon': _phoneController.text,
-        'updated_at': DateTime.now().toIso8601String(),
-      };
-      
-      final headers = {
-        'apikey': Endpoints.supabaseAnonKey,
-        'Authorization': 'Bearer ${Endpoints.supabaseAnonKey}',
-        'Content-Type': 'application/json',
-        'Prefer': 'return=representation',
-      };
-
-      if (_localProfileId == null) {
-        // Belum punya ID, berarti buat baru (Insert)
-        final url = Uri.parse('${Endpoints.supabaseUrl}/rest/v1/profil_karyawan');
-        final response = await http.post(
-          url,
-          headers: headers,
-          body: jsonEncode(profileData),
-        );
-
-        if (response.statusCode == 201 || response.statusCode == 200) {
-          final List<dynamic> responseData = jsonDecode(response.body);
-          if (responseData.isNotEmpty) {
-            _localProfileId = responseData.first['id'] as int;
-            await prefs.setInt('profile_id', _localProfileId!);
-          }
-        } else {
-          throw Exception('Gagal membuat profil: ${response.body}');
-        }
-      } else {
-        // Sudah punya ID, berarti update data yang ada
-        final url = Uri.parse('${Endpoints.supabaseUrl}/rest/v1/profil_karyawan?id=eq.$_localProfileId');
-        final response = await http.patch(
-          url,
-          headers: headers,
-          body: jsonEncode(profileData),
-        );
-        
-        if (response.statusCode != 200 && response.statusCode != 204) {
-          throw Exception('Gagal memperbarui profil: ${response.body}');
-        }
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user != null) {
+        // Upsert ke tabel profiles di Supabase
+        await Supabase.instance.client.from('profiles').upsert({
+          'id': user.id,
+          'full_name': _nameController.text,
+          'role': _positionController.text,
+        });
       }
 
-      // Tetap simpan ke shared_prefs agar sapaan di Home cepat muncul
-      await prefs.setString('emp_name', _nameController.text);
-      await prefs.setString('emp_position', _positionController.text);
+      // Tetap simpan ke shared_prefs agar cepat diakses
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('nama', _nameController.text);
+      await prefs.setString('role', _positionController.text);
       await prefs.setString('emp_phone', _phoneController.text);
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Profil berhasil disimpan ke Cloud!'),
+          content: Text('Profil berhasil disimpan!'),
           backgroundColor: Colors.green,
         ),
       );
@@ -320,6 +269,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         onPressed: () async {
                           final prefs = await SharedPreferences.getInstance();
                           await prefs.clear();
+                          // Logout dari Supabase
+                          await Supabase.instance.client.auth.signOut();
                           if (mounted) {
                             Navigator.pushReplacementNamed(context, '/login');
                           }

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:trplapp/services/data_service.dart';
 
 class UploadFoto extends StatefulWidget {
@@ -28,6 +29,20 @@ class _UploadFotoState extends State<UploadFoto> {
 
   // Inisialisasi ImagePicker untuk akses kamera
   final ImagePicker _picker = ImagePicker();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfileData();
+  }
+
+  Future<void> _loadProfileData() async {
+    final prefs = await SharedPreferences.getInstance();
+    final nama = prefs.getString('nama') ?? '';
+    setState(() {
+      _nimController.text = nama;
+    });
+  }
 
   // Fungsi untuk meminta izin kamera dan mengambil foto
   Future<void> _ambilFoto() async {
@@ -130,10 +145,13 @@ class _UploadFotoState extends State<UploadFoto> {
                     // 1. UI Form Input NIM
                     TextFormField(
                       controller: _nimController,
+                      readOnly: true, // Tidak bisa diedit karena otomatis dari profil
                       decoration: const InputDecoration(
                         labelText: 'Masukkan Nama Anda',
                         border: OutlineInputBorder(),
                         prefixIcon: Icon(Icons.badge),
+                        filled: true,
+                        fillColor: Colors.black12, // Memberi warna abu-abu tanda tidak bisa diedit
                       ),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
