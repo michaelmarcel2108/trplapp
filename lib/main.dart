@@ -1,18 +1,25 @@
 import "package:flutter/material.dart";
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'screens/home_screen.dart';
 import 'screens/main_navigation_screen.dart'; 
 import 'screens/profile_screen.dart';
 import 'screens/upload_foto_screen.dart';
+import 'screens/login_screen.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  final prefs = await SharedPreferences.getInstance();
+  final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
 
-  runApp(const MyApp());
+  runApp(MyApp(isLoggedIn: isLoggedIn));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final bool isLoggedIn;
+
+  const MyApp({super.key, required this.isLoggedIn});
 
   @override
   Widget build(BuildContext context) {
@@ -22,10 +29,11 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
       
-      initialRoute: '/',
+      initialRoute: isLoggedIn ? '/main' : '/login',
 
       routes: {
-        '/': (context) => const MainNavigationScreen(),
+        '/login': (context) => const LoginScreen(),
+        '/main': (context) => const MainNavigationScreen(),
         '/home': (context) => const HomeScreen(),
         '/profile': (context) => const ProfileScreen(),
         '/upload_foto':(context) => const UploadFoto(),

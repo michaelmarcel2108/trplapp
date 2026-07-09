@@ -12,12 +12,13 @@ class DataService {
         'Prefer': 'return=representation',
       };
 
-  static Future<List<Datas>> fetchDatas() async {
+  static Future<List<Datas>> fetchDatas({http.Client? client}) async {
+    final httpClient = client ?? http.Client();
     try {
       final url = Uri.parse(
           '${Endpoints.supabaseUrl}/rest/v1/presensi?select=*&order=created_at.desc');
 
-      final response = await http.get(url, headers: _headers);
+      final response = await httpClient.get(url, headers: _headers);
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
@@ -31,6 +32,30 @@ class DataService {
     }
   }
 
+  static Future<Map<String, dynamic>?> login(String username, String password, {http.Client? client}) async {
+    final httpClient = client ?? http.Client();
+    try {
+      final url = Uri.parse(
+          '${Endpoints.supabaseUrl}/rest/v1/akun_karyawan?select=*&username=eq.$username&password=eq.$password');
+
+      final response = await httpClient.get(url, headers: _headers);
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        if (data.isNotEmpty) {
+          return data.first as Map<String, dynamic>;
+        } else {
+          return null;
+        }
+      } else {
+        throw Exception(
+            'Failed to login: ${response.statusCode} - ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Failed to login: $e');
+    }
+  }
+
   Future<dynamic> postGambarKamera(
     File foto,
     String nim, {
@@ -38,7 +63,9 @@ class DataService {
     String? deskripsi,
     String? status,
     String? tanggal,
+    http.Client? client,
   }) async {
+    final httpClient = client ?? http.Client();
     try {
       final fileName =
           '${DateTime.now().millisecondsSinceEpoch}_${foto.path.split(Platform.pathSeparator).last}';
@@ -55,7 +82,7 @@ class DataService {
         'Content-Type': 'application/octet-stream',
       };
 
-      final uploadResponse = await http.post(
+      final uploadResponse = await httpClient.post(
         uploadUrl,
         headers: uploadHeaders,
         body: bytes,
@@ -83,7 +110,7 @@ class DataService {
         if (tanggal != null) 'created_at': tanggal,
       };
 
-      final insertResponse = await http.post(
+      final insertResponse = await httpClient.post(
         insertUrl,
         headers: _headers,
         body: jsonEncode(bodyData),

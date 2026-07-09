@@ -1,9 +1,11 @@
 import 'dart:io';
 
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:http/http.dart' as http;
+import 'package:trplapp/endpoints/endpoints.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -29,42 +31,48 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _loadProfile() async {
     final prefs = await SharedPreferences.getInstance();
-    
+
     // Coba ambil ID profil dari penyimpanan lokal
     _localProfileId = prefs.getInt('profile_id');
-    
+
     // Ambil data dasar dari shared_prefs sebagai cadangan sementara (optimistic loading)
     _nameController.text = prefs.getString('emp_name') ?? '';
     _positionController.text = prefs.getString('emp_position') ?? '';
     _phoneController.text = prefs.getString('emp_phone') ?? '';
     _profileImagePath = prefs.getString('emp_image_path');
 
-    // Jika punya ID, coba sinkronkan data terbaru dari Supabase
     if (_localProfileId != null) {
       try {
-        final data = await Supabase.instance.client
-            .from('profil_karyawan')
-            .select()
-            .eq('id', _localProfileId!)
-            .maybeSingle();
-
-        if (data != null) {
-          setState(() {
-            _nameController.text = data['nama_lengkap'] ?? '';
-            _positionController.text = data['jabatan'] ?? '';
-            _phoneController.text = data['no_telepon'] ?? '';
+        final url = Uri.parse(
+            '${Endpoints.supabaseUrl}/rest/v1/profil_karyawan?id=eq.$_localProfileId&select=*');
             
-            // Perbarui cache lokal juga
-            prefs.setString('emp_name', _nameController.text);
-            prefs.setString('emp_position', _positionController.text);
-            prefs.setString('emp_phone', _phoneController.text);
-          });
+        final response = await http.get(url, headers: {
+          'apikey': Endpoints.supabaseAnonKey,
+          'Authorization': 'Bearer ${Endpoints.supabaseAnonKey}',
+          'Content-Type': 'application/json',
+        });
+
+        if (response.statusCode == 200) {
+          final List<dynamic> responseData = jsonDecode(response.body);
+          if (responseData.isNotEmpty) {
+            final data = responseData.first;
+            setState(() {
+              _nameController.text = data['nama_lengkap'] ?? '';
+              _positionController.text = data['jabatan'] ?? '';
+              _phoneController.text = data['no_telepon'] ?? '';
+
+              // Perbarui cache lokal juga
+              prefs.setString('emp_name', _nameController.text);
+              prefs.setString('emp_position', _positionController.text);
+              prefs.setString('emp_phone', _phoneController.text);
+            });
+          }
         }
       } catch (e) {
-        debugPrint('Gagal memuat profil dari Supabase: $e');
+        debugPrint('Gagal memuat profil dari API: $e');
       }
     }
-    
+
     setState(() {
       _isLoading = false;
     });
@@ -77,40 +85,59 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
 
     try {
-      final supabase = Supabase.instance.client;
       final prefs = await SharedPreferences.getInstance();
-      
+
       final profileData = {
         'nama_lengkap': _nameController.text,
         'jabatan': _positionController.text,
         'no_telepon': _phoneController.text,
         'updated_at': DateTime.now().toIso8601String(),
       };
+      
+      final headers = {
+        'apikey': Endpoints.supabaseAnonKey,
+        'Authorization': 'Bearer ${Endpoints.supabaseAnonKey}',
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation',
+      };
 
       if (_localProfileId == null) {
         // Belum punya ID, berarti buat baru (Insert)
-        final response = await supabase
-            .from('profil_karyawan')
-            .insert(profileData)
-            .select()
-            .single();
-            
-        // Simpan ID yang baru dibuat ke memori lokal HP
-        _localProfileId = response['id'] as int;
-        await prefs.setInt('profile_id', _localProfileId!);
+        final url = Uri.parse('${Endpoints.supabaseUrl}/rest/v1/profil_karyawan');
+        final response = await http.post(
+          url,
+          headers: headers,
+          body: jsonEncode(profileData),
+        );
+
+        if (response.statusCode == 201 || response.statusCode == 200) {
+          final List<dynamic> responseData = jsonDecode(response.body);
+          if (responseData.isNotEmpty) {
+            _localProfileId = responseData.first['id'] as int;
+            await prefs.setInt('profile_id', _localProfileId!);
+          }
+        } else {
+          throw Exception('Gagal membuat profil: ${response.body}');
+        }
       } else {
         // Sudah punya ID, berarti update data yang ada
-        await supabase
-            .from('profil_karyawan')
-            .update(profileData)
-            .eq('id', _localProfileId!);
+        final url = Uri.parse('${Endpoints.supabaseUrl}/rest/v1/profil_karyawan?id=eq.$_localProfileId');
+        final response = await http.patch(
+          url,
+          headers: headers,
+          body: jsonEncode(profileData),
+        );
+        
+        if (response.statusCode != 200 && response.statusCode != 204) {
+          throw Exception('Gagal memperbarui profil: ${response.body}');
+        }
       }
-      
+
       // Tetap simpan ke shared_prefs agar sapaan di Home cepat muncul
       await prefs.setString('emp_name', _nameController.text);
       await prefs.setString('emp_position', _positionController.text);
       await prefs.setString('emp_phone', _phoneController.text);
-      
+
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -162,9 +189,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         child: CircleAvatar(
                           radius: 50,
                           backgroundColor: Colors.white,
-                          backgroundImage: _profileImagePath != null ? FileImage(File(_profileImagePath!)) : null,
-                          child: _profileImagePath == null 
-                              ? Icon(Icons.person, size: 60, color: Colors.indigo[300]) 
+                          backgroundImage: _profileImagePath != null
+                              ? FileImage(File(_profileImagePath!))
+                              : null,
+                          child: _profileImagePath == null
+                              ? Icon(
+                                  Icons.person,
+                                  size: 60,
+                                  color: Colors.indigo[300],
+                                )
                               : null,
                         ),
                       ),
@@ -175,9 +208,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           decoration: BoxDecoration(
                             color: Colors.blue,
                             shape: BoxShape.circle,
-                            border: Border.all(color: Colors.indigo[800]!, width: 2),
+                            border: Border.all(
+                              color: Colors.indigo[800]!,
+                              width: 2,
+                            ),
                           ),
-                          child: const Icon(Icons.camera_alt, size: 20, color: Colors.white),
+                          child: const Icon(
+                            Icons.camera_alt,
+                            size: 20,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                     ],
@@ -198,7 +238,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
               padding: const EdgeInsets.all(20.0),
               child: Card(
                 elevation: 3,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(15),
+                ),
                 child: Padding(
                   padding: const EdgeInsets.all(20.0),
                   child: Column(
@@ -256,16 +298,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             borderRadius: BorderRadius.circular(10),
                           ),
                         ),
-                        child: _isLoading 
-                          ? const SizedBox(
-                              height: 20, 
-                              width: 20, 
-                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
-                            )
-                          : const Text(
-                              'Simpan Profil',
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                            ),
+                        child: _isLoading
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Text(
+                                'Simpan Profil',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                      ),
+                      const SizedBox(height: 15),
+                      OutlinedButton.icon(
+                        onPressed: () async {
+                          final prefs = await SharedPreferences.getInstance();
+                          await prefs.clear();
+                          if (mounted) {
+                            Navigator.pushReplacementNamed(context, '/login');
+                          }
+                        },
+                        icon: const Icon(Icons.logout, color: Colors.red),
+                        label: const Text('Logout', style: TextStyle(color: Colors.red)),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 15),
+                          side: const BorderSide(color: Colors.red),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -289,7 +356,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         });
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Foto profil berhasil diubah secara lokal.')),
+          const SnackBar(
+            content: Text('Foto profil berhasil diubah secara lokal.'),
+          ),
         );
       }
     } catch (e) {
